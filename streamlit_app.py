@@ -1,151 +1,140 @@
 import streamlit as st
+import numpy as np
 import pandas as pd
-import math
-from pathlib import Path
+import altair as alt
+import ast
+import pydeck as pdk
+import json
+# Define the sidebar options
+page = st.sidebar.radio("Choose a page", ["Page 1", "Page 2"])
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP Dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
-
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
-
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
-
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP Dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
+# Display content based on the selected option
+if page == "Page 1":
 
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
+  print("Hello")
+  # # Page title
+  # st.set_page_config(page_title='Price Right Explorer', page_icon='📊')
+  st.title('📊 Price Right Explorer')
 
-st.header(f'GDP in {to_year}', divider='gray')
+  with st.expander('About this app'):
+    st.markdown('**What can this app do?**')
+    st.info('This app shows the approximate price at which someone can mark their property.')
+    st.markdown('**How to use the app?**')
+    st.warning('Select/Provide some values to below fields related to your property.')
+    
+  st.subheader('To provide a rough estimate for the place ($)')
 
-''
+  # Load data
+  df = pd.read_csv('./filtered_listings_detailed.csv')
 
-cols = st.columns(4)
+  locations = df.neighbourhood_group_cleansed
+  # Input widgets
+  location = st.text_input("Enter Street:")
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+  df.accommodates = df.accommodates.astype('int')
+  accomodates = df.accommodates.unique()
+  accomodates.sort()
+  accomodates_selection = st.selectbox('Select number of people', accomodates)
 
-    with col:
-        first_gdp = first_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
+  property_type = df.property_type.unique()
+  property_type_selection = st.selectbox('Property Type', property_type)
 
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+  df.bedrooms = df.bedrooms.fillna(0).astype(int)
+  bedroom = df.bedrooms.unique()
+  bedroom.sort()
+  bedroom_selection = st.selectbox('Bedrooms', bedroom)
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+  amenities = set()
+  for amenities_str in df.amenities:
+      amn = amenities_str.replace('["','')
+      amn = amn.replace('"]','')
+      amn = amn.split('", "')
+      for a in amn:
+        amenities.add(a.strip())
+
+  amenities_list = list(amenities)
+  amenities_select = st.multiselect('Select amenities available', amenities_list);
+
+
+  #Display price
+  st.markdown("# The average price for your property would be $1500", unsafe_allow_html=True)
+  st.header("This is Page 1")
+  st.write("Here's some content for Page 1.")
+elif page == "Page 2":
+  df = pd.read_csv('./filtered_listings_detailed.csv')
+
+  def clean_price(price):
+      return float(price.replace('$', '').replace(',', ''))
+
+  df['price'] = df['price'].apply(clean_price)
+
+  with open('./data/Neighborhood_Map_Atlas_Neighborhoods.geojson') as f:
+      geojson_data = json.load(f)
+
+  print("Hello")
+
+  # Streamlit application starts
+  st.title('Seattle Map based on Price Range')
+
+  # # Taking price range input from user
+  # min_price = st.number_input('Minimum Price', min_value=0)
+  # max_price = st.number_input('Maximum Price', min_value=0)
+
+  min_value = 0
+
+  max_price = int(df['price'].max())
+  print("The maximum price in the dataset is:", max_price)
+
+  min_price, max_price = st.slider(
+      'What is the price range you are looking for (per day)?',
+      min_value=0,
+      max_value=max_price,
+      value=[min_value, max_price])
+
+  # Filtering the dataset based on the price range
+  filtered_data = df[(df['price'] >= min_price) & (df['price'] <= max_price)]
+
+  neighborhood_count = filtered_data['neighbourhood_cleansed'].value_counts().head(10)
+  top_neighborhoods = neighborhood_count.index.tolist()
+
+  # Plotting the map with neighborhood boundaries
+  map_layer = pdk.Layer(
+      "GeoJsonLayer",
+      geojson_data,
+      stroked=True,  # Ensure that the boundary lines are drawn
+      filled=True,  # Fill the neighborhoods for visibility
+      get_fill_color=[0, 0, 0, 20],  # Use a semi-transparent fill
+      get_line_color=[255, 165, 0],  # Set the boundary lines to white for visibility
+      get_line_width=2,  # Set the line width to make the boundaries more noticeable
+      line_width_min_pixels=1,  # Minimum line width in pixels
+  )
+
+
+  point_layer = pdk.Layer(
+      'ScatterplotLayer',
+      data=filtered_data,
+      get_position='[longitude, latitude]',
+      get_color='[200, 30, 0, 160]',
+      get_radius=100,
+  )
+
+  st.pydeck_chart(pdk.Deck(
+      map_style='mapbox://styles/mapbox/light-v9',
+      initial_view_state=pdk.ViewState(
+          latitude=47.6062,  # Correct latitude for Seattle
+          longitude=-122.3321,  # Correct longitude for Seattle
+          zoom=11,
+          pitch=50,
+      ),
+      layers=[point_layer, map_layer]
+  ))
+
+  # Display the top 10 neighborhoods with the most listings within the price range
+  st.subheader("Top 10 Neighborhoods with Most Listings within Price Range")
+  st.table(neighborhood_count)
+
+  # Show the filtered data in a table
+  st.write(filtered_data)
+
+  # Run the Streamlit app by pasting this code into a .py file and execute it with `streamlit run your_app.py`
