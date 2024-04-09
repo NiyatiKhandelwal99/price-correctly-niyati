@@ -3,28 +3,19 @@ import pandas as pd
 import pydeck as pdk
 import json
 
-print("Hello1")
+df = pd.read_csv('./filtered_listings_detailed.csv')
+
+def clean_price(price):
+    return float(price.replace('$', '').replace(',', ''))
+
+df['price'] = df['price'].apply(clean_price)
+
+with open('./data/Neighborhood_Map_Atlas_Neighborhoods.geojson') as f:
+    geojson_data = json.load(f)
 
 def show():
-# Load your dataset here
-    df = pd.read_csv('./filtered_listings_detailed.csv')
-
-    def clean_price(price):
-        return float(price.replace('$', '').replace(',', ''))
-
-    df['price'] = df['price'].apply(clean_price)
-
-    with open('./data/Neighborhood_Map_Atlas_Neighborhoods.geojson') as f:
-        geojson_data = json.load(f)
-
-    print("Hello")
-
-    # Streamlit application starts
+    
     st.title('Seattle Map based on Price Range')
-
-    # # Taking price range input from user
-    # min_price = st.number_input('Minimum Price', min_value=0)
-    # max_price = st.number_input('Maximum Price', min_value=0)
 
     min_value = 0
 
