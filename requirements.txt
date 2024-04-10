@@ -4,3 +4,5 @@ requests
 joblib
 pydeck
 scikit-learn
+json
+plotly
