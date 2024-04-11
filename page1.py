@@ -35,7 +35,7 @@ def show():
     
     print("Location: ",location)
     print("Zip code: ",zip_code)
-    latitude, longitude = get_coordinates(location+",Seattle, WA "+zip_code, "0964937f262f41b5a5372ceddfd602ed")
+    latitude, longitude = get_coordinates(location+",Seattle, WA "+zip_code, st.secrets["API_KEY"])
     print(latitude, longitude)
 
     # Initial list of property types
@@ -117,14 +117,12 @@ def show():
     amenities_list = list(amenities)
     amenities_select = st.multiselect('Select amenities available', amenities_list, help="Tip: Statistics show that listing amenities like 'Hot Water', 'Carbon Monoxide Alarm', 'Smoke Alarm' are liked by customers.")
     
-    # Space before the info box
-    for _ in range(1):  # Adjust the range to increase/decrease space
+    for _ in range(1):
         st.write("")
 
     # Info box with a message
     st.info('If all details look good, press the "Calculate" button below to see the average price for your property.')
 
-    # Calculate button with more attractive result display
     if st.button('Calculate'):
 
         data = {
@@ -141,7 +139,6 @@ def show():
             else:
                 df[amenity] = 0
 
-        #commented out - Niyati
         for property in property_types:
             if (property != property_type_selection):
                 df['property_type_'+property] = 0
