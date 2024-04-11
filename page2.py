@@ -26,7 +26,7 @@ def show():
 
     st.markdown("## Map based on Price Range")
     min_value = 0
-    max_price = 4000 # after analysing the data in the dataset
+    max_price = 1000 # after analysing the data in the dataset
 
     min_price, max_price = st.slider(
         'What is the price range you are looking for (per day)?',
