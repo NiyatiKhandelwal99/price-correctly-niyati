@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import requests
-from joblib import dump, load
+from joblib import load
+import numpy as np
 import sklearn
 
 def get_coordinates(address, api_key):
@@ -26,17 +27,12 @@ def show():
     
     st.subheader('To provide a rough estimate for the place ($)')
 
-    # Load data
-    df = pd.read_csv('./filtered_listings_detailed.csv')
-
     # Input widgets
     location = st.text_input("(*) Enter Street:")
     zip_code = st.text_input("(*) Enter Zip Code:")
     
     print("Location: ",location)
     print("Zip code: ",zip_code)
-    latitude, longitude = get_coordinates(location+",Seattle, WA "+zip_code, st.secrets["API_KEY"])
-    print(latitude, longitude)
 
     # Initial list of property types
     property_types = [
@@ -104,10 +100,8 @@ def show():
         
     bathroom_options = [0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6]
     bathroom_selection = st.selectbox('Bathrooms', bathroom_options)
-
-    df.accommodates = df.accommodates.astype('int')
-    accomodates = df.accommodates.unique()
-    accomodates.sort()
+    
+    accomodates = [0,1 , 2 , 3 , 4 , 5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16 ]
     accomodates_selection = st.selectbox('Max number of people it can accomodate', accomodates)
 
 
@@ -124,6 +118,10 @@ def show():
     st.info('If all details look good, press the "Calculate" button below to see the average price for your property.')
 
     if st.button('Calculate'):
+
+        latitude, longitude = get_coordinates(location+",Seattle, WA "+zip_code, st.secrets["API_KEY"])
+        print(latitude, longitude)
+
 
         data = {
         'latitude': latitude,
@@ -162,4 +160,36 @@ def show():
 
         df = df[model_columns]
         y_output = model.predict(df)
-        st.success(f"### You should list your property for: ${round(y_output[0], 2)} per night! :moneybag:")
+        # st.success(f"### You should list your property for: ${round(y_output[0], 2)} per night! :moneybag:")
+        
+        def predict_with_uncertainty(X, model, n_samples=100, alpha=0.05, noise_scale=0.01):
+            # Reshape X to 1D array
+            X_1d = X.to_numpy().ravel()
+
+            # Generate synthetic data points by adding noise to the input
+            synthetic_X = np.random.normal(loc=X_1d, scale=noise_scale, size=(n_samples, len(X_1d)))
+            
+            # Make predictions on the synthetic data points
+            predictions = model.predict(synthetic_X)
+            
+            # Calculate the percentile bounds
+            lower = np.percentile(predictions, 100 * alpha / 2.)
+            upper = np.percentile(predictions, 100 * (1 - alpha / 2.))
+    
+            return lower, upper
+        df = df[model_columns]
+        noise_scale = 0.003
+        lower_bounds, upper_bounds = predict_with_uncertainty(df, model, noise_scale=noise_scale)
+        predicted_price = round(y_output[0], 2)
+        price_lower_bound = round(lower_bounds, 2)
+        price_upper_bound = round(upper_bounds, 2)
+        price_range_message = f" {price_lower_bound} - {price_upper_bound} / night"
+
+        # Combined and improved message output
+        st.success(
+            f"### Recommended Listing Price ($): {predicted_price} / night :moneybag:\n"
+            f"#### Price Range ($): {price_range_message}"
+        )
+        # st.success(f"### You should list your property for: ${round(y_output[0], 2)} per night! :moneybag:")
+            
+        # st.success(f"### A range of :- ${round(lower_bounds, 2)} - ${round(upper_bounds, 2)} per night! :moneybag:")

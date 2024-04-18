@@ -5,3 +5,4 @@ joblib
 pydeck
 scikit-learn
 plotly
+numpy
